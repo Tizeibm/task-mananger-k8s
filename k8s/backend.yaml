@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: springboot-backend
+  template:
+    metadata:
+      labels:
+        app: springboot-backend
+    spec:
+      containers:
+        - name: task-backend
+          image: task-backend:1.0
+          imagePullPolicy: IfNotPresent  # Essentiel pour utiliser l'image locale !
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: db-config  # Charge DB_HOST, DB_PORT, DB_NAME, DB_USER d'un coup !
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-secret
+                  key: DB_PASSWORD
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+spec:
+  type: NodePort  # Accessible depuis l'extérieur (le navigateur web)
+  selector:
+    app: springboot-backend
+  ports:
+    - port: 8080
+      targetPort: 8080
