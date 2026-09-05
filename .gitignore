@@ -1,1 +1,3 @@
-k8s/secret.yaml
+k8s/secret.yamil
+frontend/node_modules
+backend/target
