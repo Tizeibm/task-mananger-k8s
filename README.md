@@ -51,7 +51,7 @@ graph TD
     end
 ```
 
-![Texte alternatif](images/project.png "Architecture cloud AWS")
+![Texte alternatif](project.png "Architecture cloud AWS")
 
 ### 🔐 Sécurité
 
