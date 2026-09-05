@@ -1,0 +1,13 @@
+spring:
+  application:
+    name: list
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:taskdb}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:infernix58}
+  jpa:
+      hibernate:
+        ddl-auto: update
+      properties:
+        hibernate:
+          dialect: org.hibernate.dialect.PostgreSQLDialect

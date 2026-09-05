@@ -1,0 +1,104 @@
+<div class="min-h-screen bg-slate-50 py-8 px-4 sm:px-6 lg:px-8 font-sans">
+  <div class="max-w-3xl mx-auto">
+    
+    <!-- Header -->
+    <div class="text-center mb-10">
+      <h1 class="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600 tracking-tight">
+        Task Manager
+      </h1>
+      <p class="mt-3 text-lg text-slate-500">Gérez vos tâches efficacement et simplement.</p>
+    </div>
+
+    <!-- Formulaire d'ajout (Glassmorphism/Card) -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 sm:p-8 mb-10 transition-all hover:shadow-md">
+      <h3 class="text-xl font-semibold text-slate-800 mb-6 flex items-center">
+        <svg class="w-5 h-5 mr-2 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+        Nouvelle Tâche
+      </h3>
+      
+      <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+        <div class="sm:col-span-2">
+          <label class="block text-sm font-medium text-slate-700 mb-1">Nom de la tâche <span class="text-red-500">*</span></label>
+          <input type="text" [(ngModel)]="newTask.name" placeholder="Ex: Faire les courses" 
+                 class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-slate-50 focus:bg-white outline-none">
+        </div>
+        
+        <div class="sm:col-span-2">
+          <label class="block text-sm font-medium text-slate-700 mb-1">Description</label>
+          <textarea [(ngModel)]="newTask.description" placeholder="Détails de la tâche..." rows="2"
+                    class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-slate-50 focus:bg-white outline-none resize-none"></textarea>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Heure de début</label>
+          <input type="time" [(ngModel)]="newTask.startTime" 
+                 class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-slate-50 focus:bg-white outline-none">
+        </div>
+        
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Heure de fin</label>
+          <input type="time" [(ngModel)]="newTask.endTime" 
+                 class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-slate-50 focus:bg-white outline-none">
+        </div>
+      </div>
+
+      <div class="mt-6 flex justify-end">
+        <button (click)="addTask()" 
+                [disabled]="!newTask.name"
+                class="inline-flex items-center px-6 py-2.5 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+          Ajouter la tâche
+        </button>
+      </div>
+    </div>
+
+    <!-- Liste des tâches -->
+    <div class="space-y-4">
+      <div class="flex justify-between items-center mb-4 px-2">
+        <h3 class="text-xl font-bold text-slate-800">Vos tâches</h3>
+        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-indigo-100 text-indigo-800">
+          {{ tasks.length }} {{ tasks.length > 1 ? 'tâches' : 'tâche' }}
+        </span>
+      </div>
+      
+      <!-- État vide -->
+      <div *ngIf="tasks.length === 0" class="text-center py-16 bg-white rounded-2xl border border-dashed border-slate-300 shadow-sm">
+        <svg class="mx-auto h-16 w-16 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+        </svg>
+        <h3 class="mt-4 text-base font-semibold text-slate-900">Aucune tâche en cours</h3>
+        <p class="mt-2 text-sm text-slate-500 max-w-sm mx-auto">Vous êtes à jour ! Profitez-en pour vous reposer, ou ajoutez une nouvelle tâche pour planifier votre journée.</p>
+      </div>
+
+      <!-- Éléments de la liste -->
+      <div *ngFor="let task of tasks" 
+           class="group relative bg-white rounded-xl shadow-sm border border-slate-200 p-5 transition-all duration-300 hover:shadow-md hover:border-indigo-300 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 overflow-hidden">
+        
+        <!-- Hover indicator line -->
+        <div class="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500 scale-y-0 group-hover:scale-y-100 transition-transform origin-top duration-300"></div>
+
+        <div class="flex-1 min-w-0 pl-1">
+          <div class="flex items-center gap-3 mb-1.5">
+            <h4 class="text-lg font-bold text-slate-800 truncate">{{ task.name }}</h4>
+          </div>
+          
+          <p class="text-slate-600 text-sm mb-3 line-clamp-2">{{ task.description || 'Aucune description' }}</p>
+          
+          <div class="flex items-center space-x-4 text-xs font-medium text-slate-500">
+            <span *ngIf="task.startTime || task.endTime" class="flex items-center bg-slate-100/80 px-2.5 py-1.5 rounded-md text-slate-600">
+              <svg class="w-3.5 h-3.5 mr-1.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              {{ task.startTime || '--:--' }} - {{ task.endTime || '--:--' }}
+            </span>
+          </div>
+        </div>
+
+        <button (click)="task.id && deleteTask(task.id)" 
+                class="shrink-0 mt-2 sm:mt-0 sm:opacity-0 group-hover:opacity-100 transition-all duration-200 p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:opacity-100"
+                title="Supprimer la tâche">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+        </button>
+      </div>
+
+    </div>
+  </div>
+</div>
