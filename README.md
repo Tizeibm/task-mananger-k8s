@@ -51,6 +51,8 @@ graph TD
     end
 ```
 
+![Texte alternatif](images/project.png "Architecture cloud AWS")
+
 ### 🔐 Sécurité
 
 - **Secrets Kubernetes** : Mots de passe base de données et credentials AWS ECR
@@ -213,10 +215,9 @@ terraform destroy --auto-approve
 
 ---
 
-## ☁️ Cartographie Multi-Cloud (AWS & Huawei Cloud)
+## ☁️ Cartographie Multi-Cloud (AWS)
 
-Cette architecture microservices est cloud-agnostique. Voici l'équivalence des services pour une migration vers les services managés d'AWS (préparation Solutions Architect) ou vers l'infrastructure Huawei Cloud (préparation Huawei ICT Competition / écosystème Kunpeng & openEuler) :
-
+Cette architecture microservices est cloud-agnostique. Voici l'équivalence des services pour une migration vers les services managés d'AWS (préparation Solutions Architect):
 | Composant K8s              | 🟠 AWS (Amazon Web Services) |
 | -------------------------- | --------------------------- |
 | **Control Plane**          | Amazon EKS                  |
