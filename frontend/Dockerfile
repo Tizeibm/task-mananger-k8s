@@ -1,15 +1,19 @@
-# Étape 1 : Compilation (Builder)
-FROM node:alpine AS builder
+# Étape 1 : Compilation Node.js
+FROM node:alpine AS build
 WORKDIR /app
 COPY package*.json ./
 RUN npm install
 COPY . .
-# Compile en utilisant environment.prod.ts
-RUN npm run build --configuration=production 
+RUN npm run build --configuration=production
 
-# Étape 2 : Production avec ton image locale Nginx
-FROM nginx:latest
-# Copie les fichiers statiques compilés depuis l'étape 1
-COPY --from=builder /app/dist/task-manager-front/browser /usr/share/nginx/html
+# Étape 2 : Serveur Nginx
+FROM nginx:alpine
+# Suppression de la config par défaut et injection de la nôtre
+RUN rm /etc/nginx/conf.d/default.conf
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Copie des fichiers compilés (Vérifie le chemin dist/nom-du-projet selon ton angular.json)
+COPY --from=build /app/dist/task-manager-front /usr/share/nginx/html
+
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
