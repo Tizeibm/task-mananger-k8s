@@ -12,19 +12,20 @@ spec:
       labels:
         app: angular-frontend
     spec:
+      imagePullSecrets:
+      - name: ecr-secret
       containers:
-        - name: task-frontend
-          image: task-frontend:1.1
-          imagePullPolicy: IfNotPresent
-          ports:
-            - containerPort: 80
+      - name: frontend
+        image: 878445923393.dkr.ecr.us-east-1.amazonaws.com/task-frontend:aws-v1
+        ports:
+        - containerPort: 80
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: frontend-service
 spec:
-  type: NodePort # Obligatoire pour y accéder depuis ton navigateur
+  type: NodePort
   selector:
     app: angular-frontend
   ports:

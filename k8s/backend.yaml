@@ -12,28 +12,30 @@ spec:
       labels:
         app: springboot-backend
     spec:
+      imagePullSecrets:
+      - name: ecr-secret
       containers:
-        - name: task-backend
-          image: task-backend:1.0
-          imagePullPolicy: IfNotPresent  # Essentiel pour utiliser l'image locale !
-          ports:
-            - containerPort: 8080
-          envFrom:
-            - configMapRef:
-                name: db-config  # Charge DB_HOST, DB_PORT, DB_NAME, DB_USER d'un coup !
-          env:
-            - name: DB_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: db-secret
-                  key: DB_PASSWORD
+      - name: backend
+        image: 878445923393.dkr.ecr.us-east-1.amazonaws.com/task-backend:aws-v1
+        ports:
+        - containerPort: 8080
+        # Attention ici : envFrom et env sont alignés avec ports
+        envFrom:
+        - configMapRef:
+            name: db-config  
+        env:
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db-secret
+              key: DB_PASSWORD
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: backend-service
 spec:
-  type: NodePort  # Accessible depuis l'extérieur (le navigateur web)
+  type: NodePort  
   selector:
     app: springboot-backend
   ports:
