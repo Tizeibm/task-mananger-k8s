@@ -12,8 +12,8 @@ FROM nginx:alpine
 RUN rm /etc/nginx/conf.d/default.conf
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Copie des fichiers compilés (Vérifie le chemin dist/nom-du-projet selon ton angular.json)
-COPY --from=build /app/dist/task-manager-front /usr/share/nginx/html
+# Copie des fichiers compilés 
+COPY --from=build /app/dist/task-manager-front/browser /usr/share/nginx/html
 
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
