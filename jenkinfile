@@ -1,0 +1,292 @@
+
+pipeline {
+    agent any
+
+    options {
+        timestamps()
+        disableConcurrentBuilds()
+        timeout(time: 30, unit: 'MINUTES')
+        skipDefaultCheckout(true)
+    }
+
+    parameters {
+        string(
+            name: 'AWS_REGION',
+            defaultValue: 'us-east-1',
+            description: 'Région AWS à confirmer'
+        )
+        string(
+            name: 'AWS_ACCOUNT_ID',
+            defaultValue: '',
+            description: 'Identifiant à 12 chiffres du compte AWS'
+        )
+        string(
+            name: 'BACKEND_ECR_REPOSITORY',
+            defaultValue: 'task-backend',
+            description: 'Nom du dépôt ECR backend'
+        )
+        string(
+            name: 'FRONTEND_ECR_REPOSITORY',
+            defaultValue: 'task-frontend',
+            description: 'Nom du dépôt ECR frontend'
+        )
+
+        booleanParam(
+            name: 'DEPLOY_TO_KUBEADM',
+            defaultValue: false,
+            description: 'Activer uniquement après configuration et vérification SSH'
+        )
+        string(
+            name: 'KUBEADM_HOST',
+            defaultValue: '',
+            description: 'Adresse IP ou DNS du Control Plane accessible en SSH'
+        )
+        string(
+            name: 'K8S_NAMESPACE',
+            defaultValue: 'default',
+            description: 'Namespace Kubernetes cible'
+        )
+        string(
+            name: 'BACKEND_DEPLOYMENT',
+            defaultValue: 'backend-deployment',
+            description: 'Nom du Deployment backend'
+        )
+        string(
+            name: 'BACKEND_CONTAINER_NAME',
+            defaultValue: '',
+            description: 'Nom exact du conteneur dans le Deployment backend'
+        )
+        string(
+            name: 'FRONTEND_DEPLOYMENT',
+            defaultValue: 'frontend-deployment',
+            description: 'Nom du Deployment frontend'
+        )
+        string(
+            name: 'FRONTEND_CONTAINER_NAME',
+            defaultValue: '',
+            description: 'Nom exact du conteneur dans le Deployment frontend'
+        )
+    }
+
+    environment {
+        // Les noms des identifiants Jenkins sont référencés
+        // dans les étapes qui en ont besoin.
+        DOCKER_BUILDKIT = '1'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+
+                script {
+                    if (!fileExists('backend/mvnw')) {
+                        error('backend/mvnw introuvable.')
+                    }
+                    if (!fileExists('frontend/package.json')) {
+                        error('frontend/package.json introuvable.')
+                    }
+                    if (!fileExists('backend/Dockerfile') ||
+                        !fileExists('frontend/Dockerfile')) {
+                        error('Dockerfile backend ou frontend introuvable.')
+                    }
+                    if (!fileExists('terraform')) {
+                        error('Répertoire terraform/ introuvable.')
+                    }
+
+                    if (!params.AWS_ACCOUNT_ID?.trim()) {
+                        error('Renseigne AWS_ACCOUNT_ID dans les paramètres du build.')
+                    }
+
+                    env.IMAGE_TAG =
+                        "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
+
+                    env.ECR_REGISTRY =
+                        "${params.AWS_ACCOUNT_ID}.dkr.ecr.${params.AWS_REGION}.amazonaws.com"
+
+                    env.BACKEND_IMAGE =
+                        "${env.ECR_REGISTRY}/${params.BACKEND_ECR_REPOSITORY}:${env.IMAGE_TAG}"
+
+                    env.FRONTEND_IMAGE =
+                        "${env.ECR_REGISTRY}/${params.FRONTEND_ECR_REPOSITORY}:${env.IMAGE_TAG}"
+
+                    echo "Tag des images : ${env.IMAGE_TAG}"
+                }
+            }
+        }
+
+        stage('Build backend') {
+            steps {
+                sh '''
+                    set -eu
+                    java -version
+                    chmod +x backend/mvnw
+                    cd backend
+                    ./mvnw -B -DskipTests package
+                '''
+            }
+        }
+
+        stage('Build frontend') {
+            steps {
+                sh '''
+                    set -eu
+                    node --version
+                    npm --version
+                    cd frontend
+                    npm ci
+                    npm run build
+                '''
+            }
+        }
+
+        stage('Terraform validate') {
+            steps {
+                sh '''
+                    set -eu
+                    terraform version
+
+                    terraform -chdir=terraform fmt \
+                        -check -recursive -diff
+
+                    terraform -chdir=terraform init \
+                        -backend=false -input=false
+
+                    terraform -chdir=terraform validate
+                '''
+            }
+        }
+
+        stage('Docker build and push to ECR') {
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'aws-ecr-credentials',
+                        usernameVariable: 'AWS_ACCESS_KEY_ID',
+                        passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                    )
+                ]) {
+                    sh '''
+                        set -eu
+                        set +x
+
+                        export AWS_DEFAULT_REGION="$AWS_REGION"
+
+                        ACTUAL_ACCOUNT="$(aws sts get-caller-identity \
+                            --query Account --output text)"
+
+                        if [ "$ACTUAL_ACCOUNT" != "$AWS_ACCOUNT_ID" ]; then
+                            echo "Le compte AWS authentifié ne correspond pas au compte configuré."
+                            exit 1
+                        fi
+
+                        # Les dépôts ECR doivent avoir été créés au préalable.
+                        aws ecr describe-repositories \
+                            --repository-names \
+                            "$BACKEND_ECR_REPOSITORY" \
+                            "$FRONTEND_ECR_REPOSITORY" >/dev/null
+
+                        aws ecr get-login-password \
+                            --region "$AWS_REGION" \
+                            | docker login \
+                                --username AWS \
+                                --password-stdin "$ECR_REGISTRY"
+
+                        docker build \
+                            -t "$BACKEND_IMAGE" ./backend
+
+                        docker build \
+                            -t "$FRONTEND_IMAGE" ./frontend
+
+                        docker push "$BACKEND_IMAGE"
+                        docker push "$FRONTEND_IMAGE"
+
+                        docker logout "$ECR_REGISTRY" || true
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy to kubeadm over SSH') {
+            when {
+                expression {
+                    return params.DEPLOY_TO_KUBEADM
+                }
+            }
+
+            steps {
+                script {
+                    if (!params.KUBEADM_HOST?.trim()) {
+                        error('KUBEADM_HOST est obligatoire pour le déploiement.')
+                    }
+                    if (!params.BACKEND_CONTAINER_NAME?.trim() ||
+                        !params.FRONTEND_CONTAINER_NAME?.trim()) {
+                        error('Renseigne les noms exacts des deux conteneurs Kubernetes.')
+                    }
+                }
+
+                withCredentials([
+                    sshUserPrivateKey(
+                        credentialsId: 'kubeadm-ssh-key',
+                        keyFileVariable: 'SSH_KEY',
+                        usernameVariable: 'SSH_USER'
+                    ),
+                    file(
+                        credentialsId: 'kubeadm-known-hosts',
+                        variable: 'KNOWN_HOSTS'
+                    )
+                ]) {
+                    sh '''
+                        set -eu
+                        set +x
+
+                        SSH_OPTS="-i $SSH_KEY -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$KNOWN_HOSTS"
+                        REMOTE="$SSH_USER@$KUBEADM_HOST"
+
+                        # Ne pas appliquer k8s/secret.yaml automatiquement :
+                        # les secrets doivent être gérés séparément et sûrement.
+                        ssh $SSH_OPTS "$REMOTE" \
+                            'kubectl apply -n '"$K8S_NAMESPACE"' -f -' \
+                            < k8s/configmap.yaml
+
+                        ssh $SSH_OPTS "$REMOTE" \
+                            'kubectl apply -n '"$K8S_NAMESPACE"' -f -' \
+                            < k8s/postgres.yaml
+
+                        ssh $SSH_OPTS "$REMOTE" \
+                            'kubectl apply -n '"$K8S_NAMESPACE"' -f -' \
+                            < k8s/backend.yaml
+
+                        ssh $SSH_OPTS "$REMOTE" \
+                            'kubectl apply -n '"$K8S_NAMESPACE"' -f -' \
+                            < k8s/frontend.yaml
+
+                        ssh $SSH_OPTS "$REMOTE" \
+                            "kubectl set image deployment/$BACKEND_DEPLOYMENT $BACKEND_CONTAINER_NAME=$BACKEND_IMAGE -n $K8S_NAMESPACE"
+
+                        ssh $SSH_OPTS "$REMOTE" \
+                            "kubectl set image deployment/$FRONTEND_DEPLOYMENT $FRONTEND_CONTAINER_NAME=$FRONTEND_IMAGE -n $K8S_NAMESPACE"
+
+                        ssh $SSH_OPTS "$REMOTE" \
+                            "kubectl rollout status deployment/$BACKEND_DEPLOYMENT -n $K8S_NAMESPACE --timeout=180s"
+
+                        ssh $SSH_OPTS "$REMOTE" \
+                            "kubectl rollout status deployment/$FRONTEND_DEPLOYMENT -n $K8S_NAMESPACE --timeout=180s"
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "Pipeline terminée. Tag des images : ${env.IMAGE_TAG ?: 'non défini'}"
+        }
+        failure {
+            echo 'Pipeline en échec : consulter les logs de la première étape rouge.'
+        }
+        always {
+            echo 'Fin du build.'
+        }
+    }
+}
